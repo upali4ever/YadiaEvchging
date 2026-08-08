@@ -41,7 +41,7 @@
       
       <form id="chargeForm" class="space-y-4">
         
-        <!-- Battery Visual & Inputs -->
+        <!-- Battery Inputs -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label class="block text-xs font-semibold text-gray-400 mb-1">Start Battery %</label>
@@ -87,7 +87,7 @@
       <div id="statusMsg" class="text-center text-xs font-semibold hidden"></div>
     </div>
 
-    <!-- History Table & Export -->
+    <!-- History Container & Export -->
     <div class="bg-gray-800 p-6 rounded-2xl border border-gray-700 shadow-xl space-y-4">
       <div class="flex justify-between items-center border-b border-gray-700 pb-2">
         <h2 class="text-lg font-bold text-gray-200">📜 Charging History</h2>
@@ -96,29 +96,16 @@
         </button>
       </div>
 
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs text-gray-300">
-          <thead class="bg-gray-900 text-gray-400 uppercase">
-            <tr>
-              <th class="p-3">Date</th>
-              <th class="p-3">Battery %</th>
-              <th class="p-3">Odometer</th>
-              <th class="p-3">Distance</th>
-              <th class="p-3">Cost</th>
-              <th class="p-3 text-center">Action</th>
-            </tr>
-          </thead>
-          <tbody id="historyTable" class="divide-y divide-gray-700">
-            <tr><td colspan="6" class="p-4 text-center text-gray-500">Loading data...</td></tr>
-          </tbody>
-        </table>
+      <!-- Mobile Friendly Cards Container -->
+      <div id="historyContainer">
+        <p class="p-4 text-center text-gray-500 text-xs">Loading data...</p>
       </div>
     </div>
 
   </div>
 
   <script>
-    // ⚠️ SUPABASE CREDENTIALS (ඔයාගේ Keys මෙතැනට දාන්න)
+    // ⚠️ SUPABASE CREDENTIALS (ඔයාගේ URL සහ Key මෙතැනට දාන්න)
     const SUPABASE_URL = "https://jnjzzhbktkpnevspnnto.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impuanp6aGJrdGtwbmV2c3BubnRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxNzkxMzcsImV4cCI6MjEwMTc1NTEzN30.Snm4-YEQuRKDKwM35zg9vxGczCvlxIpiqjw1s8VZiqc";
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -158,21 +145,22 @@
       renderHistoryAndCards();
     }
 
-    // Render Table & Summary Cards
+    // Render Mobile-Friendly History Cards & Summary
     function renderHistoryAndCards() {
-      const tableBody = document.getElementById('historyTable');
-      tableBody.innerHTML = '';
+      const historyContainer = document.getElementById('historyContainer');
+      historyContainer.innerHTML = '';
 
       if (allLogs.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-gray-500">තවම Data එකතු කර නැත.</td></tr>';
+        historyContainer.innerHTML = '<p class="p-4 text-center text-gray-500 text-xs">තවම Data එකතු කර නැත.</p>';
         return;
       }
 
       let totalKm = 0;
       let totalCharges = allLogs.length;
 
+      let cardsHtml = '<div class="space-y-3">';
+
       allLogs.forEach((log, index) => {
-        // Calculate distance driven since previous charge
         let distanceDriven = "-";
         if (index < allLogs.length - 1) {
           const prevOdometer = allLogs[index + 1].odometer;
@@ -185,22 +173,26 @@
 
         const dateStr = new Date(log.created_at).toLocaleDateString('si-LK', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-        const row = `
-          <tr class="hover:bg-gray-750 border-b border-gray-700">
-            <td class="p-3">${dateStr}</td>
-            <td class="p-3"><span class="text-green-400 font-semibold">${log.start_pct}% ➔ ${log.end_pct}%</span></td>
-            <td class="p-3">${log.odometer} km</td>
-            <td class="p-3 font-bold text-yellow-400">${distanceDriven}</td>
-            <td class="p-3">${log.cost ? 'Rs. ' + log.cost : '-'}</td>
-            <td class="p-3 text-center">
-              <button onclick="deleteLog(${log.id})" class="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-2 py-1 rounded transition">
+        cardsHtml += `
+          <div class="bg-gray-900 p-4 rounded-xl border border-gray-700 flex justify-between items-center shadow-md">
+            <div class="space-y-1">
+              <div class="text-xs text-gray-400">${dateStr}</div>
+              <div class="text-sm font-bold text-green-400">${log.start_pct}% ➔ ${log.end_pct}%</div>
+              <div class="text-xs text-gray-300">Odometer: <span class="font-semibold text-white">${log.odometer} km</span></div>
+              <div class="text-xs text-yellow-400 font-semibold">Distance: ${distanceDriven}</div>
+            </div>
+            <div class="text-right space-y-2">
+              <div class="text-xs font-semibold text-blue-400">${log.cost ? 'Rs. ' + log.cost : ''}</div>
+              <button onclick="deleteLog(${log.id})" class="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 shadow">
                 🗑️ Delete
               </button>
-            </td>
-          </tr>
+            </div>
+          </div>
         `;
-        tableBody.innerHTML += row;
       });
+
+      cardsHtml += '</div>';
+      historyContainer.innerHTML = cardsHtml;
 
       // Update Summary Cards
       document.getElementById('cardTotalKm').innerText = totalKm + " km";
