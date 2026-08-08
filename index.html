@@ -103,12 +103,13 @@
               <th class="p-3">Date</th>
               <th class="p-3">Battery %</th>
               <th class="p-3">Odometer</th>
-              <th class="p-3">Distance (Km)</th>
+              <th class="p-3">Distance</th>
               <th class="p-3">Cost</th>
+              <th class="p-3 text-center">Action</th>
             </tr>
           </thead>
           <tbody id="historyTable" class="divide-y divide-gray-700">
-            <tr><td colspan="5" class="p-4 text-center text-gray-500">Loading data...</td></tr>
+            <tr><td colspan="6" class="p-4 text-center text-gray-500">Loading data...</td></tr>
           </tbody>
         </table>
       </div>
@@ -163,7 +164,7 @@
       tableBody.innerHTML = '';
 
       if (allLogs.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500">තවම Data එකතු කර නැත.</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-gray-500">තවම Data එකතු කර නැත.</td></tr>';
         return;
       }
 
@@ -191,6 +192,11 @@
             <td class="p-3">${log.odometer} km</td>
             <td class="p-3 font-bold text-yellow-400">${distanceDriven}</td>
             <td class="p-3">${log.cost ? 'Rs. ' + log.cost : '-'}</td>
+            <td class="p-3 text-center">
+              <button onclick="deleteLog(${log.id})" class="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-2 py-1 rounded transition">
+                🗑️ Delete
+              </button>
+            </td>
           </tr>
         `;
         tableBody.innerHTML += row;
@@ -201,6 +207,22 @@
       document.getElementById('cardTotalCharges').innerText = totalCharges;
       const avg = totalCharges > 1 ? (totalKm / (totalCharges - 1)).toFixed(1) : 0;
       document.getElementById('cardAvgKm').innerText = avg + " km";
+    }
+
+    // Delete Function
+    async function deleteLog(id) {
+      if (confirm("මෙම Entry එක ඉවත් කිරීමට විශ්වාසද?")) {
+        const { error } = await supabaseClient
+          .from('yadea_logs')
+          .delete()
+          .eq('id', id);
+
+        if (error) {
+          alert("❌ Delete කිරීමේ දෝෂයක්: " + error.message);
+        } else {
+          loadLogs(); // Refresh list
+        }
+      }
     }
 
     // Form Submit Function
