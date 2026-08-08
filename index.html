@@ -3,9 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Yadea Charging Tracker Pro</title>
+  <title>Yadea Charging Tracker Ultimate</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen p-4 md:p-8">
 
@@ -14,33 +15,53 @@
     <!-- Header -->
     <div class="text-center space-y-1">
       <h1 class="text-3xl font-extrabold text-green-400 flex items-center justify-center gap-2">
-        ⚡ Yadea Charging Tracker
+        ⚡ Yadea Charging Tracker Pro
       </h1>
-      <p class="text-xs text-gray-400">Charging Logs, Analytics & History</p>
+      <p class="text-xs text-gray-400">Smart Charging Analytics & Maintenance Tracker</p>
     </div>
 
     <!-- Summary Cards -->
-    <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
       <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 text-center">
         <p class="text-xs text-gray-400">Total Distance</p>
         <p id="cardTotalKm" class="text-xl font-bold text-green-400">0 km</p>
       </div>
       <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 text-center">
-        <p class="text-xs text-gray-400">Total Charges</p>
-        <p id="cardTotalCharges" class="text-xl font-bold text-blue-400">0</p>
+        <p class="text-xs text-gray-400">Total Cost</p>
+        <p id="cardTotalCost" class="text-xl font-bold text-blue-400">Rs. 0</p>
       </div>
-      <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 text-center col-span-2 md:col-span-1">
+      <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 text-center">
+        <p class="text-xs text-gray-400">Cost / Km</p>
+        <p id="cardCostPerKm" class="text-xl font-bold text-purple-400">Rs. 0.0</p>
+      </div>
+      <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 text-center">
         <p class="text-xs text-gray-400">Avg. Km / Charge</p>
         <p id="cardAvgKm" class="text-xl font-bold text-yellow-400">0 km</p>
       </div>
     </div>
 
+    <!-- Maintenance Reminder Alert Box -->
+    <div class="bg-gray-800 p-5 rounded-2xl border border-gray-700 shadow-xl space-y-2">
+      <div class="flex justify-between items-center">
+        <h2 class="text-sm font-bold text-yellow-400 flex items-center gap-2">🛠️ Service & Maintenance Tracker</h2>
+        <button onclick="setNextServiceKm()" class="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-gray-300">Set Target</button>
+      </div>
+      <div class="flex justify-between text-xs text-gray-400">
+        <span>Next Service Target: <b id="targetKmText" class="text-white">3000 km</b></span>
+        <span id="serviceKmRemaining" class="text-yellow-400 font-bold">Remaining: 0 km</span>
+      </div>
+      <div class="w-full bg-gray-900 rounded-full h-3 border border-gray-700 overflow-hidden">
+        <div id="serviceBar" class="bg-yellow-500 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+      </div>
+    </div>
+
     <!-- Main Entry Form -->
     <div class="bg-gray-800 p-6 rounded-2xl border border-gray-700 shadow-xl space-y-4">
-      <h2 class="text-lg font-bold text-gray-200 border-b border-gray-700 pb-2">➕ New Charging Entry</h2>
+      <h2 id="formTitle" class="text-lg font-bold text-gray-200 border-b border-gray-700 pb-2">➕ New Charging Entry</h2>
       
       <form id="chargeForm" class="space-y-4">
-        
+        <input type="hidden" id="editLogId" value="">
+
         <!-- Battery Inputs -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -66,7 +87,7 @@
           </div>
         </div>
 
-        <!-- Odometer & Unit Cost -->
+        <!-- Odometer & Cost -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label class="block text-xs font-semibold text-gray-400 mb-1">Odometer Reading (km)</label>
@@ -74,17 +95,47 @@
                    class="w-full bg-gray-900 border border-gray-700 p-3 rounded-xl focus:border-green-500 text-white outline-none">
           </div>
           <div>
-            <label class="block text-xs font-semibold text-gray-400 mb-1">Est. Electricity Cost (Rs.) - Optional</label>
+            <label class="block text-xs font-semibold text-gray-400 mb-1">Electricity Cost (Rs.)</label>
             <input type="number" id="cost" step="0.01" placeholder="eg: 150" 
                    class="w-full bg-gray-900 border border-gray-700 p-3 rounded-xl focus:border-green-500 text-white outline-none">
           </div>
         </div>
 
-        <button type="submit" id="saveBtn" class="w-full bg-green-600 hover:bg-green-500 text-gray-900 font-bold py-3 rounded-xl shadow-lg transition duration-200">
-          Data එක Save කරන්න
-        </button>
+        <!-- Location & Duration -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-gray-400 mb-1">Charging Location</label>
+            <select id="location" class="w-full bg-gray-900 border border-gray-700 p-3 rounded-xl focus:border-green-500 text-white outline-none">
+              <option value="Home">🏠 Home</option>
+              <option value="Office">🏢 Office</option>
+              <option value="Outside">🔌 Outside / Public</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-400 mb-1">Charge Duration (Hours) - Optional</label>
+            <input type="number" id="duration" step="0.1" placeholder="eg: 4.5" 
+                   class="w-full bg-gray-900 border border-gray-700 p-3 rounded-xl focus:border-green-500 text-white outline-none">
+          </div>
+        </div>
+
+        <div class="flex gap-2">
+          <button type="submit" id="saveBtn" class="w-full bg-green-600 hover:bg-green-500 text-gray-900 font-bold py-3 rounded-xl shadow-lg transition duration-200">
+            Data එක Save කරන්න
+          </button>
+          <button type="button" id="cancelEditBtn" onclick="resetForm()" class="hidden bg-gray-700 hover:bg-gray-600 text-white px-4 rounded-xl font-semibold">
+            Cancel
+          </button>
+        </div>
       </form>
       <div id="statusMsg" class="text-center text-xs font-semibold hidden"></div>
+    </div>
+
+    <!-- Analytics Chart -->
+    <div class="bg-gray-800 p-6 rounded-2xl border border-gray-700 shadow-xl space-y-4">
+      <h2 class="text-lg font-bold text-gray-200 border-b border-gray-700 pb-2">📊 Charging History Chart</h2>
+      <div class="h-64">
+        <canvas id="costChart"></canvas>
+      </div>
     </div>
 
     <!-- History Container & Export -->
@@ -105,12 +156,14 @@
   </div>
 
   <script>
-    // ⚠️ SUPABASE CREDENTIALS (ඔයාගේ URL සහ Key මෙතැනට දාන්න)
+     // ⚠️ SUPABASE CREDENTIALS (ඔයාගේ Keys මෙතැනට දාන්න)
     const SUPABASE_URL = "https://jnjzzhbktkpnevspnnto.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impuanp6aGJrdGtwbmV2c3BubnRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxNzkxMzcsImV4cCI6MjEwMTc1NTEzN30.Snm4-YEQuRKDKwM35zg9vxGczCvlxIpiqjw1s8VZiqc";
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+
     let allLogs = [];
+    let myChart = null;
 
     // UI Battery Bar Animation
     const startInput = document.getElementById('startPct');
@@ -129,7 +182,7 @@
     startInput.addEventListener('input', updateBatteryVisual);
     endInput.addEventListener('input', updateBatteryVisual);
 
-    // Fetch Data from Supabase
+    // Load Data
     async function loadLogs() {
       const { data, error } = await supabaseClient
         .from('yadea_logs')
@@ -143,9 +196,10 @@
 
       allLogs = data || [];
       renderHistoryAndCards();
+      renderChart();
     }
 
-    // Render Mobile-Friendly History Cards & Summary
+    // Render Cards & Analytics
     function renderHistoryAndCards() {
       const historyContainer = document.getElementById('historyContainer');
       historyContainer.innerHTML = '';
@@ -156,6 +210,7 @@
       }
 
       let totalKm = 0;
+      let totalCost = 0;
       let totalCharges = allLogs.length;
 
       let cardsHtml = '<div class="space-y-3">';
@@ -171,21 +226,31 @@
           }
         }
 
+        if (log.cost) totalCost += parseFloat(log.cost);
+
         const dateStr = new Date(log.created_at).toLocaleDateString('si-LK', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
         cardsHtml += `
           <div class="bg-gray-900 p-4 rounded-xl border border-gray-700 flex justify-between items-center shadow-md">
             <div class="space-y-1">
-              <div class="text-xs text-gray-400">${dateStr}</div>
+              <div class="text-xs text-gray-400 flex items-center gap-2">
+                <span>${dateStr}</span>
+                <span class="bg-gray-800 text-gray-300 px-1.5 py-0.5 rounded border border-gray-700">${log.location || 'Home'}</span>
+              </div>
               <div class="text-sm font-bold text-green-400">${log.start_pct}% ➔ ${log.end_pct}%</div>
               <div class="text-xs text-gray-300">Odometer: <span class="font-semibold text-white">${log.odometer} km</span></div>
               <div class="text-xs text-yellow-400 font-semibold">Distance: ${distanceDriven}</div>
             </div>
             <div class="text-right space-y-2">
               <div class="text-xs font-semibold text-blue-400">${log.cost ? 'Rs. ' + log.cost : ''}</div>
-              <button onclick="deleteLog(${log.id})" class="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 shadow">
-                🗑️ Delete
-              </button>
+              <div class="flex gap-1 justify-end">
+                <button onclick="editLog(${log.id})" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-2.5 py-1 rounded transition">
+                  ✏️ Edit
+                </button>
+                <button onclick="deleteLog(${log.id})" class="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-2.5 py-1 rounded transition">
+                  🗑️
+                </button>
+              </div>
             </div>
           </div>
         `;
@@ -194,35 +259,87 @@
       cardsHtml += '</div>';
       historyContainer.innerHTML = cardsHtml;
 
-      // Update Summary Cards
+      // Update Cards
       document.getElementById('cardTotalKm').innerText = totalKm + " km";
+      document.getElementById('cardTotalCost').innerText = "Rs. " + totalCost.toFixed(0);
       document.getElementById('cardTotalCharges').innerText = totalCharges;
+      const costPerKm = totalKm > 0 ? (totalCost / totalKm).toFixed(2) : "0.0";
+      document.getElementById('cardCostPerKm').innerText = "Rs. " + costPerKm;
       const avg = totalCharges > 1 ? (totalKm / (totalCharges - 1)).toFixed(1) : 0;
       document.getElementById('cardAvgKm').innerText = avg + " km";
+
+      // Maintenance Progress
+      updateMaintenanceTracker();
     }
 
-    // Delete Function
-    async function deleteLog(id) {
-      if (confirm("මෙම Entry එක ඉවත් කිරීමට විශ්වාසද?")) {
-        const { error } = await supabaseClient
-          .from('yadea_logs')
-          .delete()
-          .eq('id', id);
+    // Maintenance Service Tracker
+    function updateMaintenanceTracker() {
+      const targetKm = parseInt(localStorage.getItem('nextServiceKm')) || 3000;
+      document.getElementById('targetKmText').innerText = targetKm + " km";
 
-        if (error) {
-          alert("❌ Delete කිරීමේ දෝෂයක්: " + error.message);
-        } else {
-          loadLogs(); // Refresh list
-        }
+      if (allLogs.length > 0) {
+        const currentOdometer = allLogs[0].odometer; // Latest Odometer
+        const remaining = targetKm - currentOdometer;
+        document.getElementById('serviceKmRemaining').innerText = remaining > 0 ? `Remaining: ${remaining} km` : "⚠️ Service Due!";
+
+        const progress = Math.min(100, Math.max(0, (currentOdometer / targetKm) * 100));
+        const serviceBar = document.getElementById('serviceBar');
+        serviceBar.style.width = progress + '%';
+        if (remaining <= 0) serviceBar.className = "bg-red-500 h-3 rounded-full transition-all";
       }
     }
 
-    // Form Submit Function
+    function setNextServiceKm() {
+      const currentTarget = localStorage.getItem('nextServiceKm') || 3000;
+      const val = prompt("ඊළඟ Service එක කරන්න ඕනේ Target Odometer (km) අගය යොදන්න:", currentTarget);
+      if (val) {
+        localStorage.setItem('nextServiceKm', parseInt(val));
+        updateMaintenanceTracker();
+      }
+    }
+
+    // Chart.js Visualization
+    function renderChart() {
+      const ctx = document.getElementById('costChart').getContext('2d');
+      const reversedLogs = [...allLogs].reverse();
+
+      const labels = reversedLogs.map(l => new Date(l.created_at).toLocaleDateString('si-LK', { month: 'numeric', day: 'numeric' }));
+      const costs = reversedLogs.map(l => l.cost || 0);
+
+      if (myChart) myChart.destroy();
+
+      myChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Cost (Rs.)',
+            data: costs,
+            borderColor: '#3B82F6',
+            backgroundColor: 'rgba(59, 130, 246, 0.2)',
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { ticks: { color: '#9CA3AF' }, grid: { color: '#374151' } },
+            x: { ticks: { color: '#9CA3AF' }, grid: { color: '#374151' } }
+          },
+          plugins: { legend: { labels: { color: '#F3F4F6' } } }
+        }
+      });
+    }
+
+    // Form Submit (Save / Update)
     document.getElementById('chargeForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       
       const saveBtn = document.getElementById('saveBtn');
       const statusMsg = document.getElementById('statusMsg');
+      const editId = document.getElementById('editLogId').value;
 
       saveBtn.innerText = "Save වෙමින් පවතී...";
       saveBtn.disabled = true;
@@ -231,20 +348,26 @@
         start_pct: parseInt(startInput.value),
         end_pct: parseInt(endInput.value),
         odometer: parseInt(document.getElementById('odometer').value),
-        cost: parseFloat(document.getElementById('cost').value) || null
+        cost: parseFloat(document.getElementById('cost').value) || null,
+        location: document.getElementById('location').value,
+        duration: parseFloat(document.getElementById('duration').value) || null
       };
 
-      const { error } = await supabaseClient.from('yadea_logs').insert([payload]);
+      let res;
+      if (editId) {
+        res = await supabaseClient.from('yadea_logs').update(payload).eq('id', editId);
+      } else {
+        res = await supabaseClient.from('yadea_logs').insert([payload]);
+      }
 
-      if (error) {
-        statusMsg.innerText = "❌ Error: " + error.message;
+      if (res.error) {
+        statusMsg.innerText = "❌ Error: " + res.error.message;
         statusMsg.className = "text-center text-xs font-semibold text-red-500 mt-2";
       } else {
-        statusMsg.innerText = "✅ Data එක සාර්ථකව Save වුණා!";
+        statusMsg.innerText = editId ? "✅ Data එක Update වුණා!" : "✅ Data එක Save වුණා!";
         statusMsg.className = "text-center text-xs font-semibold text-green-400 mt-2";
-        document.getElementById('chargeForm').reset();
-        updateBatteryVisual();
-        loadLogs(); // Reload list
+        resetForm();
+        loadLogs();
       }
 
       statusMsg.classList.remove('hidden');
@@ -252,15 +375,51 @@
       saveBtn.disabled = false;
     });
 
-    // Export to CSV Function
+    // Edit Log
+    function editLog(id) {
+      const log = allLogs.find(l => l.id === id);
+      if (!log) return;
+
+      document.getElementById('editLogId').value = log.id;
+      startInput.value = log.start_pct;
+      endInput.value = log.end_pct;
+      document.getElementById('odometer').value = log.odometer;
+      document.getElementById('cost').value = log.cost || '';
+      document.getElementById('location').value = log.location || 'Home';
+      document.getElementById('duration').value = log.duration || '';
+
+      document.getElementById('formTitle').innerText = "✏️ Edit Charging Entry";
+      document.getElementById('saveBtn').innerText = "Data එක Update කරන්න";
+      document.getElementById('cancelEditBtn').classList.remove('hidden');
+      updateBatteryVisual();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function resetForm() {
+      document.getElementById('chargeForm').reset();
+      document.getElementById('editLogId').value = '';
+      document.getElementById('formTitle').innerText = "➕ New Charging Entry";
+      document.getElementById('saveBtn').innerText = "Data එක Save කරන්න";
+      document.getElementById('cancelEditBtn').classList.add('hidden');
+      updateBatteryVisual();
+    }
+
+    // Delete Log
+    async function deleteLog(id) {
+      if (confirm("මෙම Entry එක ඉවත් කිරීමට විශ්වාසද?")) {
+        const { error } = await supabaseClient.from('yadea_logs').delete().eq('id', id);
+        if (error) alert("❌ Error: " + error.message);
+        else loadLogs();
+      }
+    }
+
+    // Export CSV
     document.getElementById('exportBtn').addEventListener('click', () => {
       if (allLogs.length === 0) return alert("Export කිරීමට Data නැත!");
-      
-      let csvContent = "data:text/csv;charset=utf-8,Date,Start %,End %,Odometer,Cost\n";
-      allLogs.forEach(row => {
-        csvContent += `${row.created_at},${row.start_pct},${row.end_pct},${row.odometer},${row.cost || ''}\n`;
+      let csvContent = "data:text/csv;charset=utf-8,Date,Start %,End %,Odometer,Cost,Location,Duration\n";
+      allLogs.forEach(r => {
+        csvContent += `${r.created_at},${r.start_pct},${r.end_pct},${r.odometer},${r.cost || ''},${r.location || ''},${r.duration || ''}\n`;
       });
-
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
